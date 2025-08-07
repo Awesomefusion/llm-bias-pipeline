@@ -1,0 +1,28 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - echo Installing dependencies...
+      - pip install -r requirements.txt
+      - pip install flake8 pytest
+  pre_build:
+    commands:
+      - echo Linting code with flake8...
+      - flake8 batch_llm_inference_handler.py  # Replace with your file(s)
+  build:
+    commands:
+      - echo Running unit tests...
+      - pytest tests/  # Make sure you have tests in a /tests directory, or comment this line
+  post_build:
+    commands:
+      - echo Build and tests completed successfully.
+
+artifacts:
+  files:
+    - batch_llm_inference_handler.py
+    - requirements.txt
+    - '*'
+  discard-paths: yes

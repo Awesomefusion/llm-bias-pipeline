@@ -5,6 +5,7 @@ import os
 s3 = boto3.client('s3')
 bedrock = boto3.client('bedrock-runtime', region_name="us-east-1")
 
+
 def batch_llm_inference_handler(event, context):
     # Parse S3 trigger event
     record = event['Records'][0]
@@ -37,7 +38,10 @@ def batch_llm_inference_handler(event, context):
         })
 
     base_filename = os.path.basename(key)
-    output_key = f"prompt_outputs/{base_filename.replace('.json', '_output.json')}"
+    output_key = (
+        f"prompt_outputs/"
+        f"{base_filename.replace('.json', '_output.json')}"
+    )
 
     # Write the results as a list to S3
     s3.put_object(
@@ -46,9 +50,14 @@ def batch_llm_inference_handler(event, context):
         Body=json.dumps(results, indent=2).encode('utf-8')
     )
 
-    print(f"Processed {len(results)} prompts from {key}, wrote result to {output_key}")
+    print(
+        f"Processed {len(results)} prompts from {key}, "
+        f"wrote result to {output_key}"
+    )
 
     return {
         "statusCode": 200,
-        "body": json.dumps({"output_s3_uri": f"s3://{bucket}/{output_key}"})
+        "body": json.dumps(
+            {"output_s3_uri": f"s3://{bucket}/{output_key}"}
+        )
     }

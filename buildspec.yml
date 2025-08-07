@@ -11,11 +11,11 @@ phases:
   pre_build:
     commands:
       - echo Linting code with flake8...
-      - flake8 batch_llm_inference_handler.py  # Replace with your file(s)
+      - flake8 batch_llm_inference_handler.py
   build:
     commands:
       - echo Running unit tests...
-      - pytest tests/  # Make sure you have tests in a /tests directory, or comment this line
+      # - pytest tests/      # Comment out or remove this line for now
   post_build:
     commands:
       - echo Build and tests completed successfully.

@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Packages
+*.zip
+*.tar.gz
+
+# AWS credentials
+*.env
+
+# OS
+.DS_Store

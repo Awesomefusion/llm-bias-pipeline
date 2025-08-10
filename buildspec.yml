@@ -1,0 +1,19 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - pip install --upgrade pip
+      - pip install -r requirements.txt -t .
+  build:
+    commands:
+      - echo "Zipping Lambda function..."
+      - zip -r llm-bias-pipeline-lambda.zip .
+  post_build:
+    commands:
+      - echo "Build completed on `date`"
+artifacts:
+  files:
+    - llm-bias-pipeline-lambda.zip

@@ -4,15 +4,16 @@ import zipfile
 from datasets import load_dataset
 
 # === CONFIG ===
-DATASET_NAME = "RCantini/CLEAR-Bias"   # default dataset, can be changed
-TEXT_FIELD = "text"
+DATASET_NAME = "RCantini/CLEAR-Bias"   # default dataset
+DATASET_CONFIG = "base_prompts"        # could also be "control_set" or "jailbreak_prompts"
+TEXT_FIELD = "PROMPT"                  # correct column for CLEAR-Bias
 OUTPUT_DIR = os.path.join("..", "prompts_json")
 ZIP_FILE = os.path.join("..", "prompts_bundle.zip")
 LIMIT = 100
 
 def export_prompts():
-    print(f"Loading dataset {DATASET_NAME} ...")
-    dataset = load_dataset(DATASET_NAME, split="train")
+    print(f"Loading dataset {DATASET_NAME} ({DATASET_CONFIG}) ...")
+    dataset = load_dataset(DATASET_NAME, DATASET_CONFIG, split="train")
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 

@@ -1,15 +1,18 @@
-# Python
+# Ignore local prompt generation and results
+prompts_json/
+outputs/
+
+# Ignore dataset bundles
+prompts_bundle.zip
+
+# Python cache
 __pycache__/
 *.pyc
 
-# Packages
-*.zip
-*.tar.gz
+# IDE stuff
+.idea/
+.vscode/
 
-# AWS credentials
-*.env
-
-# OS
-.DS_Store
-
-.idea
+# Virtual envs
+venv/
+.env/

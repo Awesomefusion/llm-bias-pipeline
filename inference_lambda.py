@@ -1,61 +1,70 @@
-import os
+import boto3
 import json
-import zipfile
-from datasets import load_dataset
+import os
 
-# === CONFIG ===
-DATASET_NAME = "RCantini/CLEAR-Bias"   # default Hugging Face dataset
-TEXT_FIELD = "text"                    # field containing the prompt text
-OUTPUT_DIR = "prompts_json"            # folder for JSONs (already in repo)
-ZIP_FILE = "prompts_bundle.zip"        # zip archive name (in repo root)
-LIMIT = 100                            # number of samples to export (None = all)
+s3_client = boto3.client('s3')
+bedrock_client = boto3.client('bedrock-runtime')
 
-def export_prompts():
-    print(f"Loading dataset {DATASET_NAME} ...")
-    dataset = load_dataset(DATASET_NAME, split="train")
+MODEL_ID = os.getenv('MODEL_ID', 'amazon.nova-micro-v1:0')
+OUTPUT_BUCKET = os.getenv('OUTPUT_BUCKET', 'llm-bias-pipeline-outputs')
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+def lambda_handler(event, context):
+    try:
+        # Detect if this is an S3 event or direct invocation
+        if "Records" in event:
+            # S3 event
+            for record in event['Records']:
+                bucket = record['s3']['bucket']['name']
+                key = record['s3']['object']['key']
+                print(f"Processing file: s3://{bucket}/{key}")
 
-    count = 0
-    file_list = []
+                # Get the file from S3
+                response = s3_client.get_object(Bucket=bucket, Key=key)
+                file_content = response['Body'].read().decode('utf-8')
+                prompt_json = json.loads(file_content)
 
-    for i, row in enumerate(dataset):
-        if LIMIT and count >= LIMIT:
-            break
-        if TEXT_FIELD not in row:
-            continue
+                body = _format_for_bedrock(prompt_json)
 
-        prompt_text = row[TEXT_FIELD]
+                # Call Bedrock
+                model_output = _call_bedrock(body)
 
-        prompt_json = {
+                # Save to outputs bucket
+                output_key = key.replace('.json', '-output.json')
+                s3_client.put_object(
+                    Bucket=OUTPUT_BUCKET,
+                    Key=output_key,
+                    Body=model_output
+                )
+
+        else:
+            # Direct invocation
+            print("Direct invocation detected")
+            prompt_json = event
+            body = _format_for_bedrock(prompt_json)
+            model_output = _call_bedrock(body)
+            return json.loads(model_output)  # Return output directly in test result
+
+    except Exception as e:
+        print(f"Error processing prompt: {e}")
+        raise e
+
+def _format_for_bedrock(prompt_json):
+    """Ensure the input is in Bedrock's expected format"""
+    if "messages" in prompt_json:
+        return json.dumps(prompt_json)
+    else:
+        return json.dumps({
             "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"text": prompt_text}
-                    ]
-                }
+                {"role": "user", "content": [{"text": prompt_json.get("prompt", str(prompt_json))}]}
             ]
-        }
+        })
 
-        filename = os.path.join(OUTPUT_DIR, f"prompt_{i}.json")
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(prompt_json, f, ensure_ascii=False, indent=2)
-
-        file_list.append(filename)
-        count += 1
-
-    print(f"Exported {count} prompts to {OUTPUT_DIR}/")
-    return file_list
-
-def zip_prompts(file_list):
-    zip_path = os.path.join(".", ZIP_FILE)
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for file in file_list:
-            arcname = os.path.basename(file)
-            zipf.write(file, arcname=arcname)
-    print(f"Zipped {len(file_list)} files into {zip_path}")
-
-if __name__ == "__main__":
-    files = export_prompts()
-    zip_prompts(files)
+def _call_bedrock(body):
+    """Invoke the Bedrock model and return the result"""
+    response = bedrock_client.invoke_model(
+        modelId=MODEL_ID,
+        contentType='application/json',
+        accept='application/json',
+        body=body
+    )
+    return response['body'].read().decode('utf-8')

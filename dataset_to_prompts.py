@@ -75,7 +75,12 @@ def export_prompts(limit_base=200, limit_adv=800, clean=True, workers=8):
     print(f"\nExported {len(file_list)} prompts to {OUTPUT_DIR}/")
     return file_list
 
-def zip_prompts(file_list):
+def zip_prompts(file_list, expected_total):
+    total_files = len([f for f in os.listdir(OUTPUT_DIR) if f.endswith(".json")])
+    if total_files != expected_total:
+        print(f"⚠️ Warning: Expected {expected_total} prompts, but found {total_files}. Skipping zip.")
+        return
+
     with zipfile.ZipFile(ZIP_FILE, "w", zipfile.ZIP_DEFLATED) as zipf:
         for file in file_list:
             arcname = os.path.basename(file)
@@ -90,10 +95,11 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=8, help="Parallel workers for file writing")
     args = parser.parse_args()
 
+    expected_total = args.base + args.adv
     files = export_prompts(
         limit_base=args.base,
         limit_adv=args.adv,
         clean=not args.noclean,
         workers=args.workers
     )
-    zip_prompts(files)
+    zip_prompts(files, expected_total)

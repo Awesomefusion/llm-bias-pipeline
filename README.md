@@ -54,13 +54,15 @@ Generate Prompts
 ### Windows (PowerShell)
 
 ```powershell
-Get-ChildItem .\prompts_json\*.json | ForEach-Object { aws s3 cp $_.FullName s3://llm-bias-pipeline-inputs/ --region us-east-1 } ; Write-Host "Waiting for outputs..." ; Start-Sleep -Seconds 30 ; aws s3 sync s3://llm-bias-pipeline-outputs/ .\outputs\ --region us-east-1
+
+$inputCount=(Get-ChildItem .\prompts_json\ -Filter *.json).Count; aws s3 cp .\prompts_json\ s3://llm-bias-pipeline-inputs/ --recursive --region us-east-1; Write-Host "✅ Uploaded $inputCount prompts to S3 inputs bucket"; $elapsed=0; Write-Host "⏳ Waiting for $inputCount outputs..."; do { $outputCount=(aws s3 ls s3://llm-bias-pipeline-outputs/ --region us-east-1 | Measure-Object).Count; Write-Host "⏳ $outputCount/$inputCount outputs ready..."; Start-Sleep -Seconds_*_
 ```
 
 ### macOS / Linux (bash)
 
 ```bash
-  aws s3 cp ./prompts_json/ s3://llm-bias-pipeline-inputs/ --recursive --region us-east-1 && echo "Waiting for outputs..." && sleep 30 && aws s3 sync s3://llm-bias-pipeline-outputs/ ./outputs/ --region us-east-1
+
+inputCount=$(ls ./prompts_json/*.json | wc -l); aws s3 cp ./prompts_json/ s3://llm-bias-pipeline-inputs/ --recursive --region us-east-1 && echo "✅ Uploaded $inputCount prompts to S3 inputs bucket"; elapsed=0; echo "⏳ Waiting for $inputCount outputs..."; while true; do outputCount=$(aws s3 ls s3://llm-bias-pipeline-outputs/ --region us-east-1 | wc -l); echo "⏳ $outputCount/$inputCount outputs ready..."; if [ $outputCount -ge $inputCount ]; then echo "✅ $outputCount outputs now in S3 outputs bucket"; break; fi; sleep 5; elapsed=$((elapsed+5)); if [ $elapsed -ge 900 ]; then echo "❌ Timeout: not all outputs arrived after 15 minutes"; exit 1; fi; done; aws s3 sync s3://llm-bias-pipeline-outputs/ ./outputs/ --region us-east-1; localCount=$(ls ./outputs/*-output.json 2>/dev/null | wc -l); echo "✅ Synced $localCount outputs to ./outputs/"
 ```
 
 ### License

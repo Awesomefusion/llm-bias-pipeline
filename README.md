@@ -71,7 +71,7 @@ Get-ChildItem .\prompts_json\*.json | ForEach-Object { $inputFile=$_.FullName; $
 ### macOS / Linux (bash)
 
 ```bash
-  for inputFile in prompts_json/*.json; do fileName=$(basename "$inputFile"); outputFile="${fileName%.json}-output.json"; aws s3 cp "$inputFile" s3://llm-bias-pipeline-inputs/ --region us-east-1; echo "Waiting for $outputFile..."; while ! aws s3 ls s3://llm-bias-pipeline-outputs/$outputFile --region us-east-1 > /dev/null; do sleep 2; done; aws s3 cp s3://llm-bias-pipeline-outputs/$outputFile ./outputs/ --region us-east-1; echo "Saved $outputFile to outputs/"; done
+  mkdir -p ./outputs; for inputFile in $(ls ./prompts_json/prompt_*.json | sort -V); do fileName=$(basename "$inputFile"); outputFile="${fileName%.json}-output.json"; aws s3 cp "$inputFile" s3://llm-bias-pipeline-inputs/ --region us-east-1; echo "Waiting for $outputFile..."; until aws s3 ls "s3://llm-bias-pipeline-outputs/$outputFile" --region us-east-1 >/dev/null 2>&1; do sleep 2; done; aws s3 cp "s3://llm-bias-pipeline-outputs/$outputFile" ./outputs/ --region us-east-1; echo "Saved $outputFile to outputs/"; done
 ```
 
 ### License

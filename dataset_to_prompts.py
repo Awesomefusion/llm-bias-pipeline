@@ -4,19 +4,30 @@ import zipfile
 import shutil
 import argparse
 from datasets import load_dataset
+from concurrent.futures import ThreadPoolExecutor
 
 # === CONFIG DEFAULTS ===
-DATASET_NAME = "RCantini/CLEAR-Bias"   # default dataset
-DATASET_CONFIG = "base_prompts"        # could also be "control_set" or "jailbreak_prompts"
-TEXT_FIELD = "PROMPT"                  # correct column for CLEAR-Bias
-OUTPUT_DIR = "prompts_json"            # stay inside project root
-ZIP_FILE = "prompts_bundle.zip"        # bundle inside project root
-OUTPUTS_DIR = "outputs"                # local folder for Lambda results
-DEFAULT_LIMIT = 100
+DATASET_NAME = "RCantini/CLEAR-Bias"
+BASE_CONFIG = "base_prompts"
+ADV_CONFIG = "jailbreak_prompts"
+TEXT_FIELD = "PROMPT"
+OUTPUT_DIR = "prompts_json"
+ZIP_FILE = "prompts_bundle.zip"
+OUTPUTS_DIR = "outputs"
 
-def export_prompts(limit=DEFAULT_LIMIT, clean=True):
-    print(f"Loading dataset {DATASET_NAME} ({DATASET_CONFIG}) ...")
-    dataset = load_dataset(DATASET_NAME, DATASET_CONFIG, split="train")
+def write_prompt(file_path, text):
+    """Helper to write one prompt JSON file"""
+    prompt_json = {
+        "messages": [
+            {"role": "user", "content": [{"text": text}]}
+        ]
+    }
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(prompt_json, f, ensure_ascii=False, indent=2)
+    return file_path
+
+def export_prompts(limit_base=200, limit_adv=800, clean=True, workers=8):
+    file_list = []
 
     # Clean old files if enabled
     if clean:
@@ -31,31 +42,35 @@ def export_prompts(limit=DEFAULT_LIMIT, clean=True):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
-    count = 0
-    file_list = []
+    idx = 0
+    tasks = []
 
-    for i, row in enumerate(dataset):
-        if limit and count >= limit:
-            break
-        if TEXT_FIELD not in row:
-            continue
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        # === Load base prompts ===
+        print(f"Loading {limit_base} prompts from {DATASET_NAME} ({BASE_CONFIG}) ...")
+        base_ds = load_dataset(DATASET_NAME, BASE_CONFIG, split="train")
+        for row in base_ds.select(range(min(limit_base, len(base_ds)))):
+            if TEXT_FIELD not in row:
+                continue
+            filename = os.path.join(OUTPUT_DIR, f"prompt_{idx}.json")
+            tasks.append(executor.submit(write_prompt, filename, row[TEXT_FIELD]))
+            idx += 1
 
-        prompt_text = row[TEXT_FIELD]
+        # === Load adversarial prompts ===
+        print(f"Loading {limit_adv} prompts from {DATASET_NAME} ({ADV_CONFIG}) ...")
+        adv_ds = load_dataset(DATASET_NAME, ADV_CONFIG, split="train")
+        for row in adv_ds.select(range(min(limit_adv, len(adv_ds)))):
+            if TEXT_FIELD not in row:
+                continue
+            filename = os.path.join(OUTPUT_DIR, f"prompt_{idx}.json")
+            tasks.append(executor.submit(write_prompt, filename, row[TEXT_FIELD]))
+            idx += 1
 
-        prompt_json = {
-            "messages": [
-                {"role": "user", "content": [{"text": prompt_text}]}
-            ]
-        }
+        # Wait for all tasks
+        for t in tasks:
+            file_list.append(t.result())
 
-        filename = os.path.join(OUTPUT_DIR, f"prompt_{i}.json")
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(prompt_json, f, ensure_ascii=False, indent=2)
-
-        file_list.append(filename)
-        count += 1
-
-    print(f"Exported {count} prompts to {OUTPUT_DIR}/")
+    print(f"Exported {len(file_list)} prompts to {OUTPUT_DIR}/")
     return file_list
 
 def zip_prompts(file_list):
@@ -68,8 +83,10 @@ def zip_prompts(file_list):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export prompts from CLEAR-Bias dataset.")
     parser.add_argument("--noclean", action="store_true", help="Do not clean old prompts/outputs/bundle before run")
-    parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help="Limit the number of prompts to export")
+    parser.add_argument("--base", type=int, default=200, help="Number of base prompts to export")
+    parser.add_argument("--adv", type=int, default=800, help="Number of adversarial prompts to export")
+    parser.add_argument("--workers", type=int, default=8, help="Parallel workers for file writing")
     args = parser.parse_args()
 
-    files = export_prompts(limit=args.limit, clean=not args.noclean)
+    files = export_prompts(limit_base=args.base, limit_adv=args.adv, clean=not args.noclean, workers=args.workers)
     zip_prompts(files)

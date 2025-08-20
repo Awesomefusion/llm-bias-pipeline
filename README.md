@@ -35,43 +35,32 @@ The pipeline automates prompt ingestion, model inference, and output collection 
   - `llm-bias-pipeline-inputs` (input prompts)  
   - `llm-bias-pipeline-outputs` (model responses)  
 - Hugging Face `datasets` library installed for dataset export:
-  ```bash
-  pip install datasets
 
 ## Usage
 
 Generate Prompts
 
-`python dataset_to_prompts.py`
+### Windows
 
-Run Single Prompt End-to-End
+`python dataset_to_prompts.py --base 200 --adv 800
+`
+### macOS/Linux
 
-### Windows (PowerShell)
-
-```powershell
-
-`$inputFile="prompts_json\prompt_0.json"; $outputFile="prompt_0-output.json"; Compress-Archive -Path .\inference_lambda.py -DestinationPath .\llm-bias-pipeline-lambda.zip -Force; aws lambda update-function-code --function-name llm-bias-pipeline-lambda --zip-file fileb://llm-bias-pipeline-lambda.zip --region us-east-1; aws s3 cp $inputFile s3://llm-bias-pipeline-inputs/ --region us-east-1; Write-Host "Waiting for $outputFile..."; while (-not (aws s3 ls s3://llm-bias-pipeline-outputs/$outputFile --region us-east-1)) { Start-Sleep -Seconds 2 }; aws s3 cp s3://llm-bias-pipeline-outputs/$outputFile .\outputs\ --region us-east-1
-```
-
-### macOS / Linux (bash)
-
-```bash
-  inputFile="prompts_json/prompt_0.json"; outputFile="prompt_0-output.json"; zip -j llm-bias-pipeline-lambda.zip inference_lambda.py; aws lambda update-function-code --function-name llm-bias-pipeline-lambda --zip-file fileb://llm-bias-pipeline-lambda.zip --region us-east-1; aws s3 cp $inputFile s3://llm-bias-pipeline-inputs/ --region us-east-1; echo "Waiting for $outputFile..."; while ! aws s3 ls s3://llm-bias-pipeline-outputs/$outputFile --region us-east-1 > /dev/null; do sleep 2; done; aws s3 cp s3://llm-bias-pipeline-outputs/$outputFile ./outputs/ --region us-east-1
-```
-
+`python3 dataset_to_prompts.py --base 200 --adv 800
+`
 
 ### Batch Process All Prompts
 
 ### Windows (PowerShell)
 
 ```powershell
-Get-ChildItem .\prompts_json\*.json | ForEach-Object { $inputFile=$_.FullName; $fileName=$_.Name; $outputFile=$fileName -replace '\.json$','-output.json'; aws s3 cp $inputFile s3://llm-bias-pipeline-inputs/ --region us-east-1; Write-Host "Waiting for $outputFile..."; while (-not (aws s3 ls s3://llm-bias-pipeline-outputs/$outputFile --region us-east-1)) { Start-Sleep -Seconds 2 }; aws s3 cp s3://llm-bias-pipeline-outputs/$outputFile .\outputs\ --region us-east-1; Write-Host "Saved $outputFile to outputs\" }
+Get-ChildItem .\prompts_json\*.json | ForEach-Object { aws s3 cp $_.FullName s3://llm-bias-pipeline-inputs/ --region us-east-1 } ; Write-Host "Waiting for outputs..." ; Start-Sleep -Seconds 30 ; aws s3 sync s3://llm-bias-pipeline-outputs/ .\outputs\ --region us-east-1
 ```
 
 ### macOS / Linux (bash)
 
 ```bash
-  mkdir -p ./outputs; for inputFile in $(ls ./prompts_json/prompt_*.json | sort -V); do fileName=$(basename "$inputFile"); outputFile="${fileName%.json}-output.json"; aws s3 cp "$inputFile" s3://llm-bias-pipeline-inputs/ --region us-east-1; echo "Waiting for $outputFile..."; until aws s3 ls "s3://llm-bias-pipeline-outputs/$outputFile" --region us-east-1 >/dev/null 2>&1; do sleep 2; done; aws s3 cp "s3://llm-bias-pipeline-outputs/$outputFile" ./outputs/ --region us-east-1; echo "Saved $outputFile to outputs/"; done
+  aws s3 cp ./prompts_json/ s3://llm-bias-pipeline-inputs/ --recursive --region us-east-1 && echo "Waiting for outputs..." && sleep 30 && aws s3 sync s3://llm-bias-pipeline-outputs/ ./outputs/ --region us-east-1
 ```
 
 ### License

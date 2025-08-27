@@ -6,7 +6,7 @@ import argparse
 from datasets import load_dataset
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# === CONFIG DEFAULTS ===
+# CONFIG
 DATASET_NAME = "RCantini/CLEAR-Bias"
 BASE_CONFIG = "base_prompts"
 ADV_CONFIG = "jailbreak_prompts"
@@ -46,9 +46,8 @@ def export_prompts(limit_base=200, limit_adv=800, clean=True, workers=8):
 
     # Ensure fresh directories exist
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
-    # === Load datasets ===
+    # Load datasets
     print(f"Loading {limit_base} prompts from {DATASET_NAME} ({BASE_CONFIG}) ...")
     base_ds = load_dataset(DATASET_NAME, BASE_CONFIG, split="train")
     base_ds = base_ds.select(range(min(limit_base, len(base_ds))))
@@ -60,7 +59,7 @@ def export_prompts(limit_base=200, limit_adv=800, clean=True, workers=8):
     combined = list(base_ds) + list(adv_ds)
     total = len(combined)
 
-    # === Write prompts in parallel ===
+    # Write prompts in parallel
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = []
         for idx, row in enumerate(combined):

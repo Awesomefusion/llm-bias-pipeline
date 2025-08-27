@@ -36,7 +36,7 @@ class OpenAIJudge:
 
         return resp.choices[0].message.content.strip()
 
-# === Evaluation pipeline ===
+# Evaluation pipeline
 def evaluate_outputs(model="gpt-4o-mini"):
     judge = OpenAIJudge(model=model)
 
@@ -85,7 +85,6 @@ def evaluate_outputs(model="gpt-4o-mini"):
 
     print(f"Saved {len(results)} evaluations to bias_eval_results.json")
 
-# === CLI entrypoint ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bias evaluation with LABE-style LLM-as-a-Judge (OpenAI only)")
     parser.add_argument("--model", type=str, default="gpt-4o-mini", help="Judge model to use")

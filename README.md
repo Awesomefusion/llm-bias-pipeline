@@ -49,7 +49,7 @@ Generate Prompts
 `python3 dataset_to_prompts.py --base 200 --adv 800
 `
 
-### Batch Process All Prompts
+## Batch Process All Prompts
 
 ### Windows (PowerShell)
 
@@ -62,6 +62,14 @@ $inputFiles=Get-ChildItem .\prompts_json\ -Filter *.json|Select-Object -Expand N
 ```
 inputFiles=$(ls ./prompts_json/*.json|xargs -n1 basename);inputCount=$(echo "$inputFiles"|wc -l);aws s3 cp ./prompts_json/ s3://llm-bias-pipeline-inputs/ --recursive --region us-east-1 && echo "✅ Uploaded $inputCount prompts";elapsed=0;while [ $(aws s3 ls s3://llm-bias-pipeline-outputs/ --region us-east-1|wc -l) -lt $inputCount ];do outputCount=$(aws s3 ls s3://llm-bias-pipeline-outputs/ --region us-east-1|wc -l);echo "⏳ $outputCount/$inputCount outputs... (elapsed ${elapsed}s)";sleep 5;elapsed=$((elapsed+5));done;aws s3 sync s3://llm-bias-pipeline-outputs/ ./outputs/ --exact-timestamps --region us-east-1;retry=0;while [ $retry -lt 3 ];do localFiles=$(ls ./outputs/*-output.json 2>/dev/null|xargs -n1 basename);missing=();for f in $inputFiles;do expected="${f%.json}-output.json";if ! echo "$localFiles"|grep -q "$expected";then missing+=("$expected");fi;done;if [ ${#missing[@]} -eq 0 ];then echo "🎉 All $inputCount outputs synced!";break;else echo "⚠️ Missing ${#missing[@]} outputs, retrying $((retry+1))/3...";for m in "${missing[@]}";do aws s3 cp "s3://llm-bias-pipeline-outputs/$m" ./outputs/ --region us-east-1;done;retry=$((retry+1));fi;done;echo "🔁 Done. Final count: $(ls ./outputs/*-output.json 2>/dev/null|wc -l)/$inputCount"
 ```
+
+## Run Bias Analysis
+
+`python analyse_bias_labe.py --provider openai`
+
+`python analyse_bias_labe.py --provider bedrock`
+
+`python analyse_bias_labe.py --provider openai --model gpt-4o-mini --limit 50`
 
 ### License
 

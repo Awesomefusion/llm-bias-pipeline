@@ -71,6 +71,10 @@ inputFiles=$(ls ./prompts_json/*.json|xargs -n1 basename);inputCount=$(echo "$in
 
 `python analyse_bias_labe.py --provider openai --model gpt-4o-mini --limit 50`
 
+## Bias Visualisation
+
+`python visualise_bias_results.py bias_eval_results_openai_gpt-4o-mini.json --output chart.png`
+
 ### License
 
 MIT License — feel free to use, adapt, and improve.

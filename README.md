@@ -69,7 +69,7 @@ inputFiles=$(ls ./prompts_json/*.json|xargs -n1 basename);inputCount=$(echo "$in
 
 `python analyse_bias_labe.py --provider bedrock`
 
-`python analyse_bias_labe.py --provider openai --model gpt-4o-mini --limit 50`
+`python analyse_bias_labe.py --provider openai --model gpt-4o-mini --limit 0`
 
 ## Bias Visualisation
 

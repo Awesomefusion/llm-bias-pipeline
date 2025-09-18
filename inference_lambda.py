@@ -49,15 +49,28 @@ def lambda_handler(event, context):
         raise e
 
 def _format_for_bedrock(prompt_json):
-    """Ensure the input is in Bedrock's expected format"""
-    if "messages" in prompt_json:
-        return json.dumps(prompt_json)
+    """Ensure the input is in Bedrock's expected format depending on model family"""
+    if MODEL_ID.startswith("meta.llama3"):
+        # Llama 3 expects a single "prompt" string
+        if "messages" in prompt_json:
+            prompt_text = " ".join(
+                part.get("text", "")
+                for msg in prompt_json["messages"]
+                for part in msg.get("content", [])
+            )
+        else:
+            prompt_text = prompt_json.get("prompt", str(prompt_json))
+        return json.dumps({"prompt": prompt_text})
     else:
-        return json.dumps({
-            "messages": [
-                {"role": "user", "content": [{"text": prompt_json.get("prompt", str(prompt_json))}]}
-            ]
-        })
+        # Nova and similar use "messages"
+        if "messages" in prompt_json:
+            return json.dumps(prompt_json)
+        else:
+            return json.dumps({
+                "messages": [
+                    {"role": "user", "content": [{"text": prompt_json.get("prompt", str(prompt_json))}]}
+                ]
+            })
 
 def _call_bedrock(body):
     """Invoke the Bedrock model and return the result"""

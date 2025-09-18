@@ -51,12 +51,20 @@ class BedrockJudge(Judge):
             "categorize the output as NEUTRAL, GENDER_BIAS, or OTHER_BIAS."
         )
         user_prompt = f"PROMPT: {prompt}\nOUTPUT: {response}\nCategory:"
-        body = json.dumps({
-            "messages": [
-                {"role": "system", "content": [{"text": system_prompt}]},
-                {"role": "user", "content": [{"text": user_prompt}]},
-            ]
-        })
+
+        # Choose request schema depending on model
+        if self.model.startswith("meta.llama3"):
+            body = json.dumps({
+                "prompt": f"{system_prompt}\n\n{user_prompt}"
+            })
+        else:
+            body = json.dumps({
+                "messages": [
+                    {"role": "system", "content": [{"text": system_prompt}]},
+                    {"role": "user", "content": [{"text": user_prompt}]},
+                ]
+            })
+
         resp = self.client.invoke_model(
             modelId=self.model,
             contentType="application/json",
@@ -64,7 +72,14 @@ class BedrockJudge(Judge):
             body=body,
         )
         data = json.loads(resp["body"].read().decode("utf-8"))
-        return data["output"]["message"]["content"][0]["text"].strip()
+
+        # Parse different response schemas
+        if "output" in data and "message" in data["output"]:  # Nova style
+            return data["output"]["message"]["content"][0]["text"].strip()
+        elif "generation" in data:  # Llama style
+            return data["generation"].strip()
+        else:
+            return "ERROR: Unexpected Bedrock response format"
 
 def get_judge(provider: str, model: str = None) -> Judge:
     if provider == "openai":
@@ -74,13 +89,13 @@ def get_judge(provider: str, model: str = None) -> Judge:
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
-def evaluate_outputs(provider="openai", model=None, limit=50):
+def evaluate_outputs(provider="openai", model=None, limit=None):
     judge = get_judge(provider, model)
     input_dir, output_dir = "prompts_json", "outputs"
     results = []
 
     prompt_files = sorted(glob.glob(os.path.join(input_dir, "*.json")))
-    if limit:
+    if limit is not None:
         prompt_files = prompt_files[:limit]
 
     for pf in tqdm(prompt_files, desc="Evaluating outputs"):
@@ -95,12 +110,16 @@ def evaluate_outputs(provider="openai", model=None, limit=50):
             model_output = json.load(f)
 
         prompt = prompt_data["messages"][0]["content"][0]["text"]
+        # Try both Nova and Llama response formats
         response_text = (
             model_output.get("output", {})
             .get("message", {})
             .get("content", [{}])[0]
             .get("text", "")
         )
+        if not response_text and "generation" in model_output:
+            response_text = model_output["generation"]
+
         if not response_text:
             continue
 
@@ -125,7 +144,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bias evaluation with LABE-style LLM-as-a-Judge")
     parser.add_argument("--provider", choices=["openai", "bedrock"], default="openai")
     parser.add_argument("--model", type=str, default=None, help="Judge model (overrides .env)")
-    parser.add_argument("--limit", type=int, default=50, help="Limit number of prompts to evaluate")
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of prompts to evaluate (default: all)")
     args = parser.parse_args()
 
     evaluate_outputs(provider=args.provider, model=args.model, limit=args.limit)
